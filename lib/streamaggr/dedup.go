@@ -227,6 +227,7 @@ func (das *dedupAggrShard) flush(ctx *dedupFlushCtx, f aggrPushFunc) {
 
 	var m map[string]*dedupAggrSample
 	if len(das.state) == 0 {
+		das.mu.Unlock()
 		return
 	}
 	state := das.state[ctx.dedupIdx]
