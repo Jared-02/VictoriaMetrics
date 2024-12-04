@@ -85,7 +85,7 @@ Then configure `vmalert` accordingly:
     -notifier.url=http://localhost:9093 \    # AlertManager URL (required if alerting rules are used)
     -notifier.url=http://127.0.0.1:9093 \    # AlertManager replica URL
     -remoteWrite.url=http://localhost:8428 \ # Remote write compatible storage to persist rules and alerts state info (required if recording rules are used)
-    -remoteRead.url=http://localhost:8428 \  # Prometheus HTTP API compatible datasource to restore alerts state from
+    -remoteRead.url=http://localhost:8428 \  # MetricsQL compatible datasource to restore alerts state from
     -external.label=cluster=east-1 \         # External label to be applied for each rule
     -external.label=replica=a                # Multiple external labels may be set
 ```
@@ -473,6 +473,23 @@ There are the following approaches exist for alerting and recording rules across
   flag must contain the url for the specific tenant as well.
   For example, `-remoteWrite.url=http://vminsert:8480/insert/123/prometheus` would write recording
   rules to `AccountID=123`.
+
+* To use the [multitenant endpoint](https://docs.victoriametrics.com/cluster-victoriametrics/#multitenancy-via-labels) of vminsert as
+  the `-remoteWrite.url` and vmselect as the `-datasource.url`, add `extra_label` with tenant ID as an HTTP URL parameter for each group.
+  For example, run vmalert using `-datasource.url=http://vmselect:8481/select/multitenant/prometheus -remoteWrite.url=http://vminsert:8480/insert/multitenant/prometheus`,
+  along with the rule group:
+```yaml
+groups:
+- name: rules_for_tenant_456:789
+  params:
+     extra_label: [vm_account_id=456,vm_project_id=789]
+  rules:
+    # Rules for accountID=456, projectID=789
+```
+
+The multitenant endpoint in vmselect is less efficient than [specifying tenants in URL](https://docs.victoriametrics.com/cluster-victoriametrics/#url-format).
+
+For security considerations, it is recommended restricting access to multitenant endpoints only to trusted sources, since untrusted source may break per-tenant data by writing unwanted samples or get access to data of arbitrary tenants.
 
 * To specify `tenant` parameter per each alerting and recording group if
   [enterprise version of vmalert](https://docs.victoriametrics.com/enterprise/) is used
@@ -1354,7 +1371,7 @@ The shortlist of configuration flags is the following:
   -remoteRead.tlsServerName string
      Optional TLS server name to use for connections to -remoteRead.url. By default, the server name from -remoteRead.url is used
   -remoteRead.url string
-     Optional URL to datasource compatible with Prometheus HTTP API. It can be single node VictoriaMetrics or vmselect.Remote read is used to restore alerts state.This configuration makes sense only if vmalert was configured with `remoteWrite.url` before and has been successfully persisted its state. Supports address in the form of IP address with a port (e.g., http://127.0.0.1:8428) or DNS SRV record. See also '-remoteRead.disablePathAppend', '-remoteRead.showURL'.
+     Optional URL to datasource compatible with MetricsQL. It can be single node VictoriaMetrics or vmselect.Remote read is used to restore alerts state.This configuration makes sense only if vmalert was configured with `remoteWrite.url` before and has been successfully persisted its state. Supports address in the form of IP address with a port (e.g., http://127.0.0.1:8428) or DNS SRV record. See also '-remoteRead.disablePathAppend', '-remoteRead.showURL'.
   -remoteWrite.basicAuth.password string
      Optional basic auth password for -remoteWrite.url
   -remoteWrite.basicAuth.passwordFile string
