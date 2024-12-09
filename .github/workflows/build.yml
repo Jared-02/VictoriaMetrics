@@ -1,45 +1,49 @@
-name: build
+name: Build and Release
 
 on:
-  push:
-    branches:
-      - cluster
-      - master
-    paths:
-      - '**.go'
-      - '**/Dockerfile*' # The trailing * is for app/vmui/Dockerfile-*.
-      - '**/Makefile'
-  pull_request:
-    branches:
-      - cluster
-      - master
-    paths:
-      - '**.go'
-      - '**/Dockerfile*' # The trailing * is for app/vmui/Dockerfile-*.
-      - '**/Makefile'
-
-permissions:
-  contents: read
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Build version"
+        required: true
+        type: string
 
 concurrency:
   cancel-in-progress: true
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
 jobs:
-  build:
-    name: Build
+  checkout_version:
+    name: Checkout Version
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.outputs.outputs.version }}
     steps:
       - name: Code checkout
         uses: actions/checkout@v4
-
+      - name: Set version output
+        id: outputs
+        run: echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+      - name: Checkout version tag
+        run: |
+          git fetch --depth=1 origin tag ${{ inputs.version }}
+          git checkout ${{ inputs.version }}
+  
+  build:
+    name: Build
+    needs: checkout_version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.checkout_version.outputs.version }}
       - name: Setup Go
         id: go
         uses: actions/setup-go@v5
         with:
           go-version: stable
           cache: false
-
       - name: Cache Go artifacts
         uses: actions/cache@v4
         with:
@@ -49,6 +53,13 @@ jobs:
             ~/go/pkg/mod
           key: go-artifacts-${{ runner.os }}-crossbuild-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum', 'Makefile', 'app/**/Makefile') }}
           restore-keys: go-artifacts-${{ runner.os }}-crossbuild-
-
-      - name: Run crossbuild
-        run: make crossbuild
+      - name: Make vmagent
+        run: |
+          make vmagent-prod
+          make vmagent-linux-arm64-prod
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vmagent-prod-build
+          path: bin/
+          retention-days: 5
