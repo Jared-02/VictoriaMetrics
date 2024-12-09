@@ -16,6 +16,8 @@ according to [these docs](https://docs.victoriametrics.com/victorialogs/quicksta
 
 ## tip
 
+* BUGFIX: [Datadog data ingestion](https://docs.victoriametrics.com/victorialogs/data-ingestion/datadog-agent/): accepts `message` field as both string and object type to fix compatibility with Datadog serverless extension, which sends logs data in format, which is not documented. See [this issue](https://github.com/VictoriaMetrics/VictoriaMetrics/issues/7761).
+
 ## [v1.3.2](https://github.com/VictoriaMetrics/VictoriaMetrics/releases/tag/v1.3.2-victorialogs)
 
 Released at 2024-12-09
