@@ -68,12 +68,22 @@ jobs:
           name: vmagent-${{ matrix.arch }}
           path: bin/vmagent-*
           retention-days: 7
+      - name: Create archive
+        run: |
+          BINARY_NAME="vmagent-${{ matrix.arch }}-prod"
+          ARCHIVE_NAME="vmagent-${{ env.VERSION }}-${{ matrix.arch }}.tar.gz"
+          tar -czvf "bin/${ARCHIVE_NAME}" -C bin "${BINARY_NAME}"
+          cd bin && sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+        env:
+          VERSION: ${{ needs.checkout_version.outputs.version }}
       - name: Upload release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.checkout_version.outputs.version }}
+          tag_name: ${{ env.VERSION }}
           files: |-
-            bin/vmagent-${{ matrix.arch }}-prod
+            bin/vmagent-${{ env.VERSION }}-${{ matrix.arch }}.tar.gz
+            bin/vmagent-${{ env.VERSION }}-${{ matrix.arch }}.tar.gz.sha256
           generate_release_notes: true
         env:
+          VERSION: ${{ needs.checkout_version.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
