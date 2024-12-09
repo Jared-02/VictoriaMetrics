@@ -33,6 +33,12 @@ jobs:
     name: Build
     needs: checkout_version
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - linux-amd64
+          - linux-arm
+          - linux-arm64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -54,12 +60,20 @@ jobs:
           key: go-artifacts-${{ runner.os }}-crossbuild-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum', 'Makefile', 'app/**/Makefile') }}
           restore-keys: go-artifacts-${{ runner.os }}-crossbuild-
       - name: Make vmagent
-        run: |
-          make vmagent-prod
-          make vmagent-linux-arm64-prod
+        run: |-
+          make vmagent-${{ matrix.arch }}-prod
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vmagent-prod-build
-          path: bin/
-          retention-days: 5
+          name: vmagent-${{ matrix.arch }}
+          path: bin/vmagent-*
+          retention-days: 7
+      - name: Upload release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.checkout_version.outputs.version }}
+          files: |-
+            bin/vmagent-${{ matrix.arch }}-prod
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
