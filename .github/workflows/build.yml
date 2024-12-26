@@ -13,29 +13,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
 jobs:
-  checkout_version:
-    name: Checkout Version
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.outputs.outputs.version }}
-    steps:
-      - name: Code checkout
-        uses: actions/checkout@v4
-        with:
-          repository: VictoriaMetrics/VictoriaMetrics
-          ref: ${{ inputs.version }}
-      - name: Set version output
-        id: outputs
-        run: echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-      - name: Checkout version tag
-        run: |
-          git fetch --depth=1 origin tag ${{ inputs.version }}
-          git checkout ${{ inputs.version }}
-  
   build:
     name: Build
-    needs: checkout_version
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
     strategy:
       matrix:
         arch:
@@ -47,13 +29,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: VictoriaMetrics/VictoriaMetrics
-          ref: ${{ needs.checkout_version.outputs.version }}
+          ref: ${{ inputs.version }}
+          fetch-depth: 1
+
       - name: Setup Go
         id: go
         uses: actions/setup-go@v5
         with:
           go-version: stable
           cache: false
+
       - name: Cache Go artifacts
         uses: actions/cache@v4
         with:
@@ -63,23 +48,24 @@ jobs:
             ~/go/pkg/mod
           key: go-artifacts-${{ runner.os }}-crossbuild-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum', 'Makefile', 'app/**/Makefile') }}
           restore-keys: go-artifacts-${{ runner.os }}-crossbuild-
+
       - name: Make vmagent
-        run: |-
-          make vmagent-${{ matrix.arch }}-prod
+        run: make vmagent-${{ matrix.arch }}-prod
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: vmagent-${{ matrix.arch }}
           path: bin/vmagent-*
           retention-days: 7
+
       - name: Create archive
         run: |
           BINARY_NAME="vmagent-${{ matrix.arch }}-prod"
           ARCHIVE_NAME="vmagent-${{ env.VERSION }}-${{ matrix.arch }}.tar.gz"
           tar -czvf "bin/${ARCHIVE_NAME}" -C bin "${BINARY_NAME}"
           cd bin && sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
-        env:
-          VERSION: ${{ needs.checkout_version.outputs.version }}
+
       - name: Upload release
         uses: softprops/action-gh-release@v2
         with:
@@ -89,5 +75,4 @@ jobs:
             bin/vmagent-${{ env.VERSION }}-${{ matrix.arch }}.tar.gz.sha256
           generate_release_notes: true
         env:
-          VERSION: ${{ needs.checkout_version.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
