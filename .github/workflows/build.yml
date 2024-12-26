@@ -21,6 +21,9 @@ jobs:
     steps:
       - name: Code checkout
         uses: actions/checkout@v4
+        with:
+          repository: VictoriaMetrics/VictoriaMetrics
+          ref: ${{ inputs.version }}
       - name: Set version output
         id: outputs
         run: echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
@@ -43,6 +46,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          repository: VictoriaMetrics/VictoriaMetrics
           ref: ${{ needs.checkout_version.outputs.version }}
       - name: Setup Go
         id: go
